@@ -5,7 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import datetime
 import re
-from decimal import Decimal  
+from decimal import Decimal
 
 # --- Initialize AWS Clients ---
 dynamodb = boto3.resource('dynamodb')
@@ -21,6 +21,19 @@ SENDER_EMAIL = os.environ['SENDER_EMAIL']
 secrets = {} # To cache secrets
 table = dynamodb.Table(TABLE_NAME)
 
+
+def normalize_amazon_url(url):
+    """Extracts the canonical ASIN-based URL from a messy Amazon URL."""
+    # Regex to find the /dp/ASIN part
+    match = re.search(r'/(dp|gp/product)/([A-Z0-9]{10})', url)
+    if match:
+        asin = match.group(2)
+        # We build a clean, standard URL
+        return f"https://www.amazon.in/dp/{asin}"
+
+    # If no match, return the original (less ideal, but avoids crash)
+    return url
+
 def get_secrets():
     """Fetches secrets from AWS Secrets Manager and caches them."""
     global secrets
@@ -32,15 +45,14 @@ def get_secrets():
 
 def scrape_product_details(url, scraper_api_key):
     """
-    Scrapes a product page for its name, price, and image.
-    This is the same logic as the other Lambda, but we also grab the image.
+    Scrapes a product page for its name, price, image, and stock.
     """
     print(f"Scraping {url} for initial details...")
     payload = {'api_key': scraper_api_key, 'url': url}
     
     try:
-        # Using https for better practice
-        response = requests.get('https://api.scraperapi.com', params=payload, timeout=30)
+        # Using https and a 25-second timeout to avoid API Gateway timeout
+        response = requests.get('https://api.scraperapi.com', params=payload, timeout=25)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -132,6 +144,7 @@ def send_confirmation_email(recipient, product_name, current_price, image_url, p
         )
     except Exception as e:
         print(f"SES confirmation email failed: {e}")
+        raise e # Re-raise error to fail the Lambda
 
 def send_telegram_alert(chat_id, message):
     """Sends a message using the Telegram Bot API."""
@@ -147,9 +160,11 @@ def send_telegram_alert(chat_id, message):
             'text': message,
             'parse_mode': 'Markdown' # This allows for bolding and links
         }
-        requests.post(url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status() # Check for HTTP errors
     except Exception as e:
-        print(f"Telegram confirmation failed: {e}")    
+        print(f"Telegram confirmation failed: {e}")
+        raise e # Re-raise error to fail the Lambda
 
 #
 # This is the lambda_handler for addProduct.py
@@ -157,7 +172,7 @@ def send_telegram_alert(chat_id, message):
 def lambda_handler(event, context):
     print(f"Received event: {event}")
     
-    # --- Define CORS headers.---
+    # --- Define CORS headers. We'll use this in all responses ---
     cors_headers = {
         'Access-Control-Allow-Origin': '*', 
         'Access-Control-Allow-Headers': 'Content-Type',
@@ -174,12 +189,33 @@ def lambda_handler(event, context):
         notification_type = body.get('notificationType', 'EMAIL').upper()
         notification_target = body.get('notificationTarget')
         
+        # --- Basic Input Validation ---
         if not product_url or not notification_target:
              return {
                 'statusCode': 400, 
                 'headers': cors_headers,
                 'body': json.dumps('Error: Missing url or notificationTarget.')
             }
+
+        # --- Service-Based Price Validation ---
+        if service_type == 'PRICE' or service_type == 'BOTH':
+            try:
+                # Try to convert the price string to a Decimal
+                target_price_decimal = Decimal(target_price_str)
+                # Check if the price is a positive number
+                if target_price_decimal <= 0:
+                    raise ValueError("Price must be positive")
+            except Exception as e:
+                # This will catch errors like invalid text ("abc") or a price of 0 or less
+                print(f"Invalid target price: {e}")
+                return {
+                    'statusCode': 400,
+                    'headers': cors_headers,
+                    'body': json.dumps('Error: Invalid target price. Must be a number greater than 0 for this service.')
+                }
+
+        # --- Normalize the URL to use as a clean Primary Key ---
+        normalized_url = normalize_amazon_url(product_url)
 
         # 2. Determine NotifyOnStock flag based on service type
         notify_on_stock = False
@@ -190,7 +226,7 @@ def lambda_handler(event, context):
         all_secrets = get_secrets()
         scraper_api_key = all_secrets['SCRAPER_API_KEY']
         
-        # 4. Scrape for initial details
+        # 4. Scrape for initial details (using the original URL for accuracy)
         product_name, current_price, image_url, current_stock = scrape_product_details(product_url, scraper_api_key)
         
         if product_name == "Scrape Failed":
@@ -209,16 +245,16 @@ def lambda_handler(event, context):
                 'body': json.dumps('Error: This product is already in stock!')
             }
         
-        # 6. Save to DynamoDB
-        print(f"Saving item to DynamoDB: {product_url}")
+        # 6. Save to DynamoDB (using the normalized URL as the key)
+        print(f"Saving item to DynamoDB: {normalized_url}")
         table.put_item(
             Item={
-                'ProductURL': product_url,
+                'ProductURL': normalized_url,
                 'TargetPriceLow': Decimal(target_price_str),
                 'LastKnownPrice': Decimal(str(current_price)),
                 
-                'ServiceType': service_type,       # <-- NEW
-                'NotifyOnStock': notify_on_stock, # <-- NEW
+                'ServiceType': service_type,
+                'NotifyOnStock': notify_on_stock,
                 
                 'NotificationType': notification_type,
                 'NotificationTarget': notification_target,
@@ -229,15 +265,15 @@ def lambda_handler(event, context):
             }
         )
         
-        # 7. Send Confirmation
+        # 7. Send Confirmation (using the normalized URL for the link)
         if notification_type == 'EMAIL':
-            send_confirmation_email(notification_target, product_name, current_price, image_url, product_url)
+            send_confirmation_email(notification_target, product_name, current_price, image_url, normalized_url)
         elif notification_type == 'TELEGRAM':
             message = (
                 f"✅ *Tracking Added!*\n\n"
                 f"*{product_name}*\n\n"
                 f"We'll notify you here based on your selection (Price, Stock, or Both)."
-                f"\n\n[View Product]({product_url})"
+                f"\n\n[View Product]({normalized_url})"
             )
             send_telegram_alert(notification_target, message)
         
