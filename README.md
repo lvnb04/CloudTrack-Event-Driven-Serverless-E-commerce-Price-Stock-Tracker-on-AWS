@@ -11,7 +11,7 @@ CloudTrack is a full-stack, serverless application that automatically monitors e
 ---
 ## 🚀 Live Demo
 
-**[➡️ Watch the Project Demo and Walkthrough](https://drive.google.com/file/d/11J-Dj1URNgt57tqgOq-jaJCImRLWNR6j/view?usp=sharing)**
+**[➡️ Project Demo and Walkthrough](https://drive.google.com/file/d/11J-Dj1URNgt57tqgOq-jaJCImRLWNR6j/view?usp=sharing)**
 
 ---
 
