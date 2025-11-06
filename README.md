@@ -1,29 +1,36 @@
-# AWS Price Sentinel
-### An Event-Driven, Serverless E-commerce Price & Stock Tracker
+# CloudTrack
+### An Event-Driven, Serverless E-commerce Price & Stock Tracker Built on AWS
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)
 ![AWS CDK](https://img.shields.io/badge/AWS_CDK-v2-FF9900?logo=aws-cdk&logoColor=white)
 ![AWS Serverless](https://img.shields.io/badge/AWS-Serverless-FF9900?logo=amazonaws&logoColor=white)
 ![Event-Driven](https://img.shields.io/badge/Event--Driven-true-lightgrey)
 
-A fully automated, serverless application built on AWS that monitors e-commerce product prices and stock availability. Users receive real-time alerts via Email and Telegram, with the entire infrastructure deployed and managed as code using the AWS CDK.
+CloudTrack is a full-stack, serverless application that automatically monitors e-commerce product prices and stock availability. Users submit a product URL via a web interface and can choose to be notified of a price drop, a restock, or both. A daily automated process scrapes the product, and if an alert is triggered, the system sends an instant notification via Email or Telegram. The entire infrastructure—from the S3-hosted frontend to the API, Lambda functions, and database—is defined and deployed as a single, automated stack using the AWS CDK.
+
+---
+## 🚀 Live Demo
+
+**[➡️ Watch the Project Demo and Walkthrough](https://drive.google.com/file/d/11J-Dj1URNgt57tqgOq-jaJCImRLWNR6j/view?usp=sharing)**
 
 ---
 
-## 🚀 Live Demo
+### 📸 Application Snapshots
 
-**[➡️ Watch the 10-Minute Demo Video Here]**(YOUR_LINK_TO_YOUTUBE_OR_VIMEO_VIDEO)
+1. **Successful API Call (Frontend UI)**
+<img src="https://github.com/user-attachments/assets/7e8dae0d-8168-4cb8-a61b-3df65b16cd15" width="600" alt="UI">
+<br><br>
 
-### 📸 Application Screenshots
+2. **Email Confirmation**
+<img src="https://github.com/user-attachments/assets/20dc41dc-8ac4-41c8-96c8-3ec50e2dbd2b" width="600" alt="Email Confirmation">
+<br><br>
 
-**[➡️ PASTE_YOUR_ARCHITECTURE_DIAGRAM.PNG_HERE]**
-*(The final architecture of the application)*
+3. **Telegram Confirmation**
+<img src="https://github.com/user-attachments/assets/b86fd042-9b75-4f90-9c62-1f94f4144960" width="500" alt="Telegram Confirmation">
+<br><br>
 
-**[➡️ PASTE_YOUR_SCREENSHOT_1.PNG_HERE]**
-*(The frontend UI, showing the dynamic 'Service Type' selection)*
-
-**[➡️ PASTE_YOUR_SCREENSHOT_2.PNG_HERE]**
-*(Example of a successful confirmation alert sent to Telegram)*
+4. **Price Drop Alert**
+<img src="https://github.com/user-attachments/assets/52bf42c9-3f92-4679-9d4b-bfdf730d9518" width="500" alt="Price Drop Alert">
 
 ---
 
@@ -47,36 +54,51 @@ The entire application is built on a "two-flow" serverless, event-driven model:
 1.  **Flow 1 (The "Ingestion" API):** A real-time, user-facing flow for adding new products.
 2.  **Flow 2 (The "Scheduled Worker"):** An automated, backend flow for checking prices and sending alerts.
 
-### 1. Cost & Scalability (AWS Free Tier)
+<img width="1578" height="1250" alt="awsarchpng" src="https://github.com/user-attachments/assets/d0bcc980-85df-4696-a08e-7cb448e90fb2" />
+
+### 1. 💰 Cost & Scalability (AWS Free Tier)
 
 This architecture is designed to be **extremely cost-effective**. For the vast majority of personal projects, this application can be run entirely within the **AWS Free Tier**.
 
 * **AWS Lambda:** 1 million free requests per month.
 * **API Gateway (HTTP API):** 1 million free calls per month.
-* **DynamoDB:** 25 GB of storage and 25 write/read capacity units (WCU/RCU). By using **On-Demand (Pay Per Request) Billing**, the application costs $0 when idle.
+* **DynamoDB:** 25 GB of storage. By using **On-Demand (Pay Per Request) Billing**, the application costs $0 when idle.
 * **Amazon S3:** 5 GB of free storage.
 * **Amazon EventBridge:** 14 million free events per month.
 * **Amazon SES:** 1,000 free emails per month when called from a Lambda function.
 
 This means you can run a powerful, scalable application that checks thousands of products per day for virtually **$0.00**.
 
-### 2. Modular & Extensible Design (Open-Closed Principle)
+### 2. 💡 Core Software Design Principles 
 
-This project follows the **Open-Closed Principle** ("open for extension, but closed for modification"). The core logic is decoupled from its specific tools, making it highly maintainable and adaptable.
+This project was built adhering to key SOLID principles, making the architecture robust, maintainable, and extensible.
 
-* **Swappable Scraper:** The `scrapePrice` Lambda's job is *orchestration*, not scraping. It calls an external scraper API. If I want to switch from `ScraperAPI` to `BrightData` (or even a self-hosted `Selenium` grid), I only need to modify the internal `scrape_product` helper function. The main Lambda handler and all its surrounding logic (DynamoDB scans, alert routing) remain **unchanged**.
-* **Swappable Notifications:** The alert logic is a simple router. If I want to add `Twilio (SMS)` or `Slack` notifications, I simply add a new `elif notification_type == 'SMS':` block and a `send_sms_alert()` function. The existing, working Email and Telegram code is **never modified**, eliminating the risk of regression.
+* **Single Responsibility Principle (SRP):**
+    Each component in the architecture has one, and only one, reason to change.
+    * **`addProduct` Lambda:** Its *single responsibility* is to ingest, validate, and save a new product. Its one "reason to change" is if the business logic for *adding* a product changes.
+    * **`scrapePrice` Lambda:** Its *single responsibility* is to check existing products. Its one "reason to change" is if the *alerting* logic changes.
+    * **`cdk_price_tracker_stack.py`:** Its *single responsibility* is to define infrastructure. It knows nothing about scraping or business logic.
+    This separation ensures that a failure in one part (like the `scrapePrice` worker) has zero impact on another (like the `addProduct` API).
 
-### 3. Why This Design? (Service-by-Service Breakdown)
+* **Open-Closed Principle (OCP):**
+    The application is "open for extension, but closed for modification." The core logic is decoupled from its specific tools.
+    * **Swappable Scraper:** The `scrapePrice` Lambda's job is *orchestration*. If I want to switch from `ScraperAPI` to `BrightData`, I only need to modify the internal `scrape_product` helper function. The main Lambda handler and its surrounding logic remain **unchanged**.
+    * **Swappable Notifications:** The alert logic is a simple router. If I want to add `Twilio (SMS)` or `Slack` notifications, I simply add a new `elif notification_type == 'SMS':` block and a `send_sms_alert()` function. The existing, working Email and Telegram code is **never modified**, eliminating the risk of regression.
+
+* **Dependency Inversion Principle (DIP):**
+    High-level modules do not depend on low-level modules; both depend on abstractions.
+    * **High-Level Module:** The main `lambda_handler` in `scrapePrice.py`, which contains the core business logic (scan, loop, check, alert).
+    * **Low-Level Module:** The `boto3` client for SES or the `requests` call to the Telegram API.
+    * **Abstraction:** My helper functions (`send_email_alert()`, `send_telegram_alert()`).
+    The `lambda_handler` only depends on the `send_email_alert()` abstraction, not on the `boto3` implementation. This allows me to completely change *how* emails are sent (e.g., switch to SendGrid) just by modifying the helper function, without touching the main business logic.
+
+### 3. ⚙️ Why This Design? (Service-by-Service Breakdown)
 
 * **Why AWS CDK?**
     Infrastructure as Code (IaC) is the modern standard for cloud deployment. Instead of manually clicking in the AWS console (which is error-prone and not repeatable), I chose to define the entire stack in Python. This allows for 100% reproducible deployments, version control (via Git), and automated CI/CD pipelines. The CDK "synthesizes" this Python code into a robust AWS CloudFormation template.
 
-* **Why Two Lambda Functions? (Single Responsibility Principle)**
-    The application is split into two functions, each with one distinct job:
-    1.  **`addProduct` (The "Ingestion" Lambda):** Handles the user-facing API request. Its *only* job is to validate and ingest a new product. I optimized it for a fast 30-second timeout to give the user a quick response.
-    2.  **`scrapePrice` (The "Worker" Lambda):** Handles the backend processing. Its *only* job is to check products. This function is triggered by a schedule, not a user, so I optimized it for a long runtime (15-minute timeout) to process a large database without timing out.
-    This separation makes the application easier to debug, scale, and maintain.
+* **Why Two Lambda Functions? (SRP)**
+    As described in the SOLID principles, the application is split into two functions (`addProduct` and `scrapePrice`) to ensure a clean separation of concerns. This makes the system more resilient, as a failure in the backend worker (Flow 2) does not affect the user-facing API (Flow 1).
 
 * **Why API Gateway (HTTP API)?**
     I needed a public "front door" for my `addProduct` Lambda. I chose the **HTTP API** over the older REST API because it's up to 70% cheaper, has lower latency, and is simpler to configure for a basic Lambda proxy, which was all I needed.
@@ -96,6 +118,24 @@ This project follows the **Open-Closed Principle** ("open for extension, but clo
 
 * **Why Secrets Manager & SES?**
     **Secrets Manager** allows me to securely store and inject my API keys and bot tokens at runtime, keeping them out of my source code. **SES** is a powerful, managed service that allows me to send thousands of emails for pennies, with high deliverability (i.e., not going to spam).
+
+### 4. 🔒 Security & Permissions (IAM)
+
+A key part of this project is adhering to the **Principle of Least Privilege**. The AWS CDK automatically creates IAM Roles for each Lambda function, but they don't get permissions for *everything*.
+
+The CDK's `grant_read_data()` (for Secrets Manager) and `grant_read_write_data()` (for DynamoDB) are high-level "constructs" that automatically create the correct policies.
+
+However, to send email, I had to **manually add a custom policy** to each Lambda's execution role. This ensures the Lambdas can *only* access SES and no other services unnecessarily.
+
+Here is the JSON for the custom IAM policy statement that the CDK attaches to both Lambda roles:
+```json
+{
+  "Effect": "Allow",
+  "Action": "ses:SendEmail",
+  "Resource": "*"
+}
+```
+*(Note: In a production environment with multiple apps, this `Resource` would be restricted to a specific SES identity ARN.)*
 
 ---
 
@@ -152,7 +192,8 @@ This is the only manual part. The CDK needs three resources to be created first.
 * **Amazon SES:**
     1.  Go to the SES console and click "Verified identities."
     2.  Verify an email address (e.g., `you@example.com`). This will be your `SENDER_EMAIL`.
-    3.  Make sure you are *out of the SES sandbox* if you want to email other people.
+    3.  **IMPORTANT:** By default, your SES account is in a **Sandbox**. This means you can *only* send emails *to* other verified addresses.
+    4.  **To go to Production:** You must request production access from the SES console. This involves explaining your use case (e.g., "This is a personal project to send price alerts to myself and friends who opt-in"). Once approved, you can email any address.
 
 * **AWS Secrets Manager:**
     1.  Go to the Secrets Manager console and create a new secret.
