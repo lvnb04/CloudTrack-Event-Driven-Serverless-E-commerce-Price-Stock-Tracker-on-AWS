@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amazon Price Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="form-container">
+        <h1>Track a Product</h1>
+        <p>Get an alert when your product's price drops or it's back in stock!</p>
+        
+        <form id="tracker-form">
+            
+            <div class="form-group">
+                <label for="product-url">Product URL</label>
+                <input type="url" id="product-url" placeholder="https://www.amazon.in/..." required>
+            </div>
+            
+            <div class="form-group">
+                <label for="service-type">Service Type</label>
+                <select id="service-type">
+                    <option value="PRICE" selected>Price Tracking</option>
+                    <option value="STOCK">Back-in-Stock Alert</option>
+                    <option value="BOTH">Price & Stock Alert</option>
+                </select>
+            </div>
+            
+            <div id="price-input-wrapper">
+                <div class="form-group">
+                    <label for="target-price">Your Target Price (₹)</label>
+                    <input type="number" id="target-price" placeholder="150000" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="notification-type">Notification Type</label>
+                <select id="notification-type">
+                    <option value="EMAIL" selected>Email</option>
+                    <option value="TELEGRAM">Telegram</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="notification-target" id="target-label">Your Email</label>
+                <input type="text" id="notification-target" placeholder="you@example.com" required>
+                <small id="target-help-text" class="help-text">
+                    We'll send a confirmation here.
+                </small>
+            </div>
+            
+            <button type="submit" id="track-btn">Track Product</button>
+            
+        </form>
+        
+        <div id="status-message"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

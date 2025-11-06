@@ -1,10 +1,20 @@
-*.swp
-package-lock.json
-__pycache__
+# Python Virtual Environment & Cache
+.venv/
+__pycache__/
 .pytest_cache
-.venv
 *.egg-info
+*.swp
 
-# CDK asset staging directory
+# CDK
 .cdk.staging
-cdk.out
+cdk.out/
+cdk.context.json
+
+# Node
+package-lock.json
+
+# Local Scripts
+source.bat
+
+# macOS System File
+.DS_Store
